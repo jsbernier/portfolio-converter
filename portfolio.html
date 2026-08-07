@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portfolio Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 2rem;
+}
+h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+.subtitle { color: #94a3b8; margin-bottom: 2rem; font-size: 0.9rem; }
+#loading { color: #64748b; text-align: center; padding: 4rem; font-size: 1.1rem; }
+.overall {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+    margin-bottom: 2rem;
+}
+.card {
+    background: #1e293b; border-radius: 12px; padding: 1.25rem;
+    border: 1px solid #334155;
+}
+.card .label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+.card .value { font-size: 1.5rem; font-weight: 700; margin-top: 0.25rem; }
+.card.positive .value { color: #22c55e; }
+.card.negative .value { color: #ef4444; }
+.section { margin-bottom: 2.5rem; }
+.section h2 { font-size: 1.25rem; margin-bottom: 1rem; color: #f1f5f9; }
+.summary-row {
+    display: flex; gap: 1rem; margin-bottom: 1rem;
+}
+.summary-card {
+    background: #1e293b; border-radius: 8px; padding: 0.75rem 1rem;
+    border: 1px solid #334155; flex: 1;
+}
+.summary-card .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+.summary-card .value { font-size: 1.1rem; font-weight: 600; margin-top: 0.15rem; }
+.summary-card.positive .value { color: #22c55e; }
+.summary-card.negative .value { color: #ef4444; }
+table {
+    width: 100%; border-collapse: collapse;
+    background: #1e293b; border-radius: 12px; overflow: hidden;
+    border: 1px solid #334155;
+}
+th {
+    background: #0f172a; padding: 0.75rem 0.5rem;
+    text-align: right; font-size: 0.75rem; text-transform: uppercase;
+    letter-spacing: 0.05em; color: #64748b; border-bottom: 1px solid #334155;
+    white-space: nowrap; cursor: pointer; user-select: none;
+}
+th:first-child { text-align: left; padding-left: 1rem; }
+th:hover { color: #f1f5f9; }
+th .sort { margin-left: 4px; opacity: 0.4; }
+th.sort-asc .sort, th.sort-desc .sort { opacity: 1; }
+td {
+    padding: 0.6rem 0.5rem; text-align: right;
+    font-size: 0.85rem; border-bottom: 1px solid #1e293b;
+    font-variant-numeric: tabular-nums;
+}
+td:first-child { text-align: left; padding-left: 1rem; font-weight: 600; color: #f1f5f9; }
+td:nth-child(2) { text-align: left; color: #94a3b8; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+tr:hover { background: #334155; }
+tr.row-focused { background: #1e3a5f; outline: 1px solid #6366f1; }
+tr:last-child td { border-bottom: none; }
+input[type="number"] {
+    padding: 4px 6px; border-radius: 6px;
+    border: 1px solid #334155; background: #0f172a; color: #e2e8f0;
+    text-align: right; font-size: 0.85rem;
+}
+input[type="number"]:focus { outline: none; border-color: #6366f1; }
+.summary-card input.budget-input {
+    width: 120px; padding: 6px 8px; font-size: 1rem; font-weight: 700;
+    background: transparent; border: 1px solid #475569;
+}
+.budget-cost { font-variant-numeric: tabular-nums; }
+.budget-remaining { font-size: 0.7rem; color: #94a3b8; margin-top: 2px; }
+.budget-reset {
+    background: none; border: none; color: #64748b; cursor: pointer;
+    font-size: 1rem; padding: 0 2px; margin-left: 4px;
+    vertical-align: middle; line-height: 1;
+}
+.budget-reset:hover { color: #f1f5f9; }
+.budget-card { display: flex; flex-wrap: wrap; align-items: center; position: relative; }
+.budget-card .label { width: auto; }
+.budget-card .budget-reset {
+    position: absolute; right: 0.75rem; top: 0.75rem;
+    background: #ef4444; border: none; color: #fff; cursor: pointer;
+    font-size: 1.1rem; padding: 2px 6px; border-radius: 4px;
+}
+.budget-card .budget-reset:hover { background: #dc2626; }
+.budget-card .value { width: 100%; }
+.budget-card .budget-remaining { width: 100%; }
+button {
+    padding: 8px 16px; border-radius: 8px; border: none;
+    font-size: 0.85rem; font-weight: 600; cursor: pointer;
+}
+#budget-save { background: #6366f1; color: #fff; }
+#budget-save:hover { background: #4f46e5; }
+#budget-export { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; }
+#budget-export:hover { background: #334155; }
+</style>
+</head>
+<body>
+<h1>Portfolio Dashboard</h1>
+<div class="subtitle" id="subtitle">Loading...</div>
+<div id="loading">Loading portfolio data...</div>
+
+<div id="dashboard" style="display:none">
+<div class="overall" id="overall-cards"></div>
+
+<div style="display:flex; gap:1rem; margin-bottom:2rem;">
+    <button id="budget-save">Save Budget</button>
+    <button id="budget-export">Export JSON</button>
+</div>
+
+<div id="sections"></div>
+</div>
+
+<script>
+const DATA = {"CAD": [{"symbol": "AMZN-C", "nom": "AMAZON.COM INC CDR C$HDG", "qty": 60.0, "avg_cost": 25.84, "total_cost": 1550.4, "curr_price": 26.23, "day_change_d": -0.25, "day_change_p": -0.944, "market_value": 1573.8, "unrealized_pnl": 23.4, "unrealized_pnl_p": 1.509, "pct_portfolio": 9.4}, {"symbol": "BLDP-C", "nom": "BALLARD POWER SYSTEMS INC", "qty": 200.0, "avg_cost": 5.649, "total_cost": 1129.75, "curr_price": 3.87, "day_change_d": -0.21, "day_change_p": -5.147, "market_value": 774.0, "unrealized_pnl": -355.75, "unrealized_pnl_p": -31.489, "pct_portfolio": 6.9}, {"symbol": "CRM-C", "nom": "SALESFORCE CDR C$HDG", "qty": 30.0, "avg_cost": 14.287, "total_cost": 428.6, "curr_price": 13.83, "day_change_d": 0.58, "day_change_p": 4.377, "market_value": 414.9, "unrealized_pnl": -13.7, "unrealized_pnl_p": -3.196, "pct_portfolio": 2.6}, {"symbol": "CRWV-C", "nom": "COREWEAVE INC", "qty": 50.0, "avg_cost": 17.247, "total_cost": 862.35, "curr_price": 12.51, "day_change_d": -0.94, "day_change_p": -6.989, "market_value": 625.5, "unrealized_pnl": -236.85, "unrealized_pnl_p": -27.466, "pct_portfolio": 5.2}, {"symbol": "MSFT-C", "nom": "MICROSOFT CORP CDR C$HDG", "qty": 30.0, "avg_cost": 27.368, "total_cost": 821.05, "curr_price": 27.79, "day_change_d": 0.44, "day_change_p": 1.609, "market_value": 833.7, "unrealized_pnl": 12.65, "unrealized_pnl_p": 1.541, "pct_portfolio": 5.0}, {"symbol": "NKE-C", "nom": "NIKE INC CDR C$HDG", "qty": 160.0, "avg_cost": 12.704, "total_cost": 2032.65, "curr_price": 7.66, "day_change_d": 0.1, "day_change_p": 1.323, "market_value": 1225.6, "unrealized_pnl": -807.05, "unrealized_pnl_p": -39.704, "pct_portfolio": 12.3}, {"symbol": "NOWS-C", "nom": "SERVICENOW INC CDR C$HDG", "qty": 45.0, "avg_cost": 14.967, "total_cost": 673.5, "curr_price": 13.99, "day_change_d": 0.49, "day_change_p": 3.63, "market_value": 629.55, "unrealized_pnl": -43.95, "unrealized_pnl_p": -6.526, "pct_portfolio": 4.1}, {"symbol": "NVDA-C", "nom": "NVIDIA CORP CDR C$HDG", "qty": 90.0, "avg_cost": 32.95, "total_cost": 2965.53, "curr_price": 44.03, "day_change_d": 0.1, "day_change_p": 0.228, "market_value": 3962.7, "unrealized_pnl": 997.17, "unrealized_pnl_p": 33.625, "pct_portfolio": 18.0}, {"symbol": "QQC-C", "nom": "INVESCO NSDQ 100 INDX ETF", "qty": 20.0, "avg_cost": 42.533, "total_cost": 850.66, "curr_price": 46.38, "day_change_d": -0.65, "day_change_p": -1.382, "market_value": 927.6, "unrealized_pnl": 76.94, "unrealized_pnl_p": 9.045, "pct_portfolio": 5.2}, {"symbol": "SMCI-C", "nom": "SUPER MICRO CMP CDR C$HDG", "qty": 45.0, "avg_cost": 9.615, "total_cost": 432.66, "curr_price": 9.02, "day_change_d": -0.61, "day_change_p": -6.334, "market_value": 405.9, "unrealized_pnl": -26.76, "unrealized_pnl_p": -6.185, "pct_portfolio": 2.6}, {"symbol": "UNH-C", "nom": "UNITEDHEALTH CDR C$HDG", "qty": 100.0, "avg_cost": 13.559, "total_cost": 1355.85, "curr_price": 19.21, "day_change_d": 0.1, "day_change_p": 0.523, "market_value": 1921.0, "unrealized_pnl": 565.15, "unrealized_pnl_p": 41.682, "pct_portfolio": 8.2}, {"symbol": "VFV-C", "nom": "VANGUARD S&P 500 IDX ETF", "qty": 11.0, "avg_cost": 163.618, "total_cost": 1799.8, "curr_price": 185.46, "day_change_d": -0.17, "day_change_p": -0.092, "market_value": 2040.06, "unrealized_pnl": 240.26, "unrealized_pnl_p": 13.349, "pct_portfolio": 10.9}], "USD": [{"symbol": "GRAB-U", "nom": "GRAB HOLDINGS LTD CL-A", "qty": 170.0, "avg_cost": 4.519, "total_cost": 768.18, "curr_price": 3.35, "day_change_d": -0.005, "day_change_p": -0.149, "market_value": 568.65, "unrealized_pnl": -199.53, "unrealized_pnl_p": -25.974, "pct_portfolio": 4.7}, {"symbol": "NVDA-U", "nom": "NVIDIA CORP", "qty": 4.0, "avg_cost": 147.65, "total_cost": 590.6, "curr_price": 196.89, "day_change_d": 0.38, "day_change_p": 0.193, "market_value": 787.56, "unrealized_pnl": 196.96, "unrealized_pnl_p": 33.349, "pct_portfolio": 3.6}, {"symbol": "QSI-U", "nom": "QUANTUM-SI INC CL-A", "qty": 20.0, "avg_cost": 1.021, "total_cost": 20.42, "curr_price": 0.75, "day_change_d": -0.03, "day_change_p": -3.817, "market_value": 15.07, "unrealized_pnl": -5.35, "unrealized_pnl_p": -26.2, "pct_portfolio": 0.1}, {"symbol": "VLN-U", "nom": "VALENS SEMICONDUCTOR LTD", "qty": 60.0, "avg_cost": 2.989, "total_cost": 179.35, "curr_price": 1.49, "day_change_d": -0.09, "day_change_p": -5.696, "market_value": 89.4, "unrealized_pnl": -89.95, "unrealized_pnl_p": -50.153, "pct_portfolio": 1.1}], "meta": {"generated": "2026-07-28 11:21", "source": "/home/jeanseb/Downloads/portefeuille-5MK5V-ALL (2).csv", "grand_total_cost": 16461.350000000002, "grand_total_mv": 16794.989999999998, "grand_total_pnl": 333.64}};
+const SAVED = {"budget": 1000, "qtys": {}};
+const STORAGE_KEY = "portfolio-budget-data";
+
+function loadSaved() {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) return JSON.parse(stored);
+    } catch(e) {}
+    return SAVED;
+}
+
+let savedData = loadSaved();
+
+if (savedData._generated && savedData._generated !== DATA.meta.generated) {
+    savedData = { budget: 0, qtys: {}, _generated: DATA.meta.generated };
+    persistData();
+}
+if (!savedData._generated) {
+    savedData._generated = DATA.meta.generated;
+    persistData();
+}
+
+function fmt(n, suffix) {
+    if (n == null) return "N/D";
+    return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (suffix || "$");
+}
+
+function cssColor(val) {
+    if (val == null) return "";
+    return val >= 0 ? "color: #22c55e" : "color: #ef4444";
+}
+
+function persistData() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(savedData)); } catch(e) {}
+}
+
+function renderDashboard(data) {
+    const meta = data.meta;
+    const sections = ["CAD", "USD"];
+    const pnlCls = meta.grand_total_pnl >= 0 ? "positive" : "negative";
+
+    document.getElementById("subtitle").textContent = "Generated " + meta.generated + " -- Source: " + meta.source;
+
+    document.getElementById("overall-cards").innerHTML =
+        '<div class="card"><div class="label">Total Market Value</div><div class="value">' + fmt(meta.grand_total_mv) + '</div></div>' +
+        '<div class="card"><div class="label">Total Cost</div><div class="value">' + fmt(meta.grand_total_cost) + '</div></div>' +
+        '<div class="card ' + pnlCls + '"><div class="label">Total Unrealized P&L</div><div class="value">' + fmt(meta.grand_total_pnl) + '</div></div>';
+
+    let sectionsHtml = "";
+    for (const key of sections) {
+        const items = data[key];
+        if (!items || !items.length) continue;
+
+        const totalMv = items.reduce((s, i) => s + (i.market_value || 0), 0);
+        const totalCost = items.reduce((s, i) => s + (i.total_cost || 0), 0);
+        const totalPnl = items.reduce((s, i) => s + (i.unrealized_pnl || 0), 0);
+        const pnlClass = totalPnl >= 0 ? "positive" : "negative";
+
+        let rows = "";
+        for (const i of items) {
+            rows += '<tr>' +
+                '<td>' + i.symbol + '</td>' +
+                '<td>' + i.nom + '</td>' +
+                '<td>' + i.qty + '</td>' +
+                '<td>' + fmt(i.avg_cost) + '</td>' +
+                '<td>' + fmt(i.total_cost) + '</td>' +
+                '<td>' + fmt(i.curr_price) + '</td>' +
+                '<td style="' + cssColor(i.day_change_d) + '">' + fmt(i.day_change_d) + '</td>' +
+                '<td style="' + cssColor(i.day_change_p) + '">' + (i.day_change_p != null ? fmt(i.day_change_p, "%") : "N/D") + '</td>' +
+                '<td>' + fmt(i.market_value) + '</td>' +
+                '<td style="' + cssColor(i.unrealized_pnl) + '">' + fmt(i.unrealized_pnl) + '</td>' +
+                '<td style="' + cssColor(i.unrealized_pnl_p) + '">' + (i.unrealized_pnl_p != null ? fmt(i.unrealized_pnl_p, "%") : "N/D") + '</td>' +
+                '<td class="pct-portfolio" data-cost="' + (i.total_cost || 0) + '" data-grand="' + meta.grand_total_cost + '">' + (i.pct_portfolio != null ? i.pct_portfolio + "%" : "-") + '</td>' +
+                '<td><input class="budget-qty" type="number" min="0" step="1" value="0" data-symbol="' + i.symbol + '" data-price="' + (i.curr_price || 0) + '"></td>' +
+                '<td class="budget-cost">0.00$</td>' +
+                '<td class="budget-canbuy">-</td>' +
+                '</tr>';
+        }
+
+        sectionsHtml +=
+            '<div class="section">' +
+            '<h2>' + key + ' Stocks</h2>' +
+            '<div class="summary-row">' +
+            '<div class="summary-card"><span class="label">Market Value</span><span class="value">' + fmt(totalMv) + '</span></div>' +
+            '<div class="summary-card"><span class="label">Total Cost</span><span class="value">' + fmt(totalCost) + '</span></div>' +
+            '<div class="summary-card ' + pnlClass + '"><span class="label">Unrealized P&L</span><span class="value">' + fmt(totalPnl) + '</span></div>' +
+            '<div class="summary-card budget-card"><span class="label">Budget</span><button class="budget-reset" title="Reset budget &amp; qty">&#x21ba;</button><span class="value"><input class="budget-input" type="number" min="0" step="100" value="' + (savedData.budget || 0) + '" placeholder="0"></span><div class="budget-remaining">Remaining: ' + Number(savedData.budget || 0).toLocaleString() + '$</div></div>' +
+            '</div>' +
+            '<table>' +
+            '<thead><tr>' +
+            '<th data-type="text">Symbol<span class="sort"></span></th>' +
+            '<th data-type="text">Name<span class="sort"></span></th>' +
+            '<th data-type="num">Qty<span class="sort"></span></th>' +
+            '<th data-type="num">Avg Cost<span class="sort"></span></th>' +
+            '<th data-type="num">Total Cost<span class="sort"></span></th>' +
+            '<th data-type="num">Price<span class="sort"></span></th>' +
+            '<th data-type="num">Day Chg $<span class="sort"></span></th>' +
+            '<th data-type="num">Day Chg %<span class="sort"></span></th>' +
+            '<th data-type="num">Market Value<span class="sort"></span></th>' +
+            '<th data-type="num">Unrealized P&L $<span class="sort"></span></th>' +
+            '<th data-type="num">Unrealized P&L %<span class="sort"></span></th>' +
+            '<th data-type="num">% Portfolio<span class="sort"></span></th>' +
+            '<th>Buy Qty</th>' +
+            '<th data-type="num">Cost<span class="sort"></span></th>' +
+            '<th data-type="num">Can Buy<span class="sort"></span></th>' +
+            '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table>' +
+            '</div>';
+    }
+
+    document.getElementById("sections").innerHTML = sectionsHtml;
+
+    document.querySelectorAll(".budget-qty").forEach(inp => {
+        const sym = inp.dataset.symbol;
+        if (savedData.qtys && savedData.qtys[sym]) inp.value = savedData.qtys[sym];
+    });
+
+    recalcBudget();
+    wireEvents();
+
+    document.querySelectorAll(".section th[data-type='num']").forEach(th => {
+        if (th.textContent.trim().startsWith("% Portfolio")) {
+            th.click();
+        }
+    });
+
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
+}
+
+function recalcBudget() {
+    const budget = parseFloat(document.querySelector(".budget-input").value) || 0;
+    let total = 0;
+    document.querySelectorAll(".budget-qty").forEach(inp => {
+        const qty = parseFloat(inp.value) || 0;
+        const price = parseFloat(inp.dataset.price) || 0;
+        const cost = qty * price;
+        total += cost;
+        const row = inp.closest("tr");
+        if (row) row.querySelector(".budget-cost").textContent = cost.toFixed(2) + "$";
+    });
+    const remaining = budget - total;
+    document.querySelectorAll(".budget-remaining").forEach(el => el.textContent = "Remaining: " + remaining.toFixed(2) + "$");
+    document.querySelectorAll(".budget-qty").forEach(inp => {
+        const qty = parseFloat(inp.value) || 0;
+        const price = parseFloat(inp.dataset.price) || 0;
+        const row = inp.closest("tr");
+        if (!row) return;
+        const can = (price > 0 && remaining > 0) ? Math.floor(remaining / price) : "-";
+        row.querySelector(".budget-canbuy").textContent = can;
+    });
+    document.querySelectorAll(".pct-portfolio").forEach(td => {
+        const cost = parseFloat(td.dataset.cost) || 0;
+        const grand = parseFloat(td.dataset.grand) || 0;
+        const row = td.closest("tr");
+        const inp = row ? row.querySelector(".budget-qty") : null;
+        const buyQty = parseFloat(inp ? inp.value : 0) || 0;
+        const price = parseFloat(inp ? inp.dataset.price : 0) || 0;
+        const buyCost = buyQty * price;
+        const cur = grand ? (cost / grand * 100) : 0;
+        const newGrand = grand + total;
+        const proj = newGrand ? ((cost + buyCost) / newGrand * 100) : 0;
+        td.textContent = cur.toFixed(1) + "%" + (buyCost > 0 ? " (" + proj.toFixed(1) + "%)" : "");
+    });
+}
+
+function wireEvents() {
+    document.querySelectorAll(".budget-input").forEach(inp => inp.addEventListener("input", () => {
+        const v = inp.value;
+        document.querySelectorAll(".budget-input").forEach(other => other.value = v);
+        savedData.budget = parseFloat(v) || 0;
+        persistData();
+        recalcBudget();
+    }));
+    document.querySelectorAll(".budget-qty").forEach(inp => inp.addEventListener("input", () => {
+        const sym = inp.dataset.symbol;
+        const v = parseFloat(inp.value);
+        if (v) savedData.qtys[sym] = v;
+        else delete savedData.qtys[sym];
+        persistData();
+        recalcBudget();
+    }));
+    document.querySelectorAll(".budget-qty").forEach(inp => {
+        inp.addEventListener("focus", () => inp.closest("tr")?.classList.add("row-focused"));
+        inp.addEventListener("blur", () => inp.closest("tr")?.classList.remove("row-focused"));
+    });
+    document.querySelectorAll(".budget-reset").forEach(btn => btn.addEventListener("click", () => {
+        savedData = { budget: 0, qtys: {}, _generated: DATA.meta.generated };
+        persistData();
+        document.querySelectorAll(".budget-input").forEach(inp => inp.value = 0);
+        document.querySelectorAll(".budget-qty").forEach(inp => inp.value = 0);
+        recalcBudget();
+    }));
+    document.getElementById("budget-save").addEventListener("click", () => {
+        const qtys = {};
+        document.querySelectorAll(".budget-qty").forEach(inp => {
+            const v = parseFloat(inp.value);
+            if (v) qtys[inp.dataset.symbol] = v;
+        });
+        const data = {
+            budget: parseFloat(document.querySelector(".budget-input").value) || 0,
+            qtys: qtys
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "portfolio-budget.json";
+        a.click();
+    });
+    document.getElementById("budget-export").addEventListener("click", () => {
+        const blob = new Blob([JSON.stringify(window._portfolioData, null, 2)], {type: "application/json"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "portfolio-budget.json";
+        a.click();
+    });
+
+    document.querySelectorAll("table").forEach(table => {
+        const headers = table.querySelectorAll("th");
+        const tbody = table.querySelector("tbody");
+        headers.forEach((th, col) => {
+            th.addEventListener("click", () => {
+                if (!th.dataset.type) return;
+                const isNum = th.dataset.type === "num";
+                const rows = Array.from(tbody.querySelectorAll("tr"));
+                const current = th.classList.contains("sort-asc") ? "desc" : th.classList.contains("sort-desc") ? "none" : "asc";
+                headers.forEach(h => h.classList.remove("sort-asc", "sort-desc"));
+                if (current === "none") return;
+                th.classList.add(current === "asc" ? "sort-asc" : "sort-desc");
+                const m = current === "asc" ? 1 : -1;
+                rows.sort((a, b) => {
+                    const va = a.children[col].textContent.trim();
+                    const vb = b.children[col].textContent.trim();
+                    if (isNum) {
+                        const na = parseFloat(va.replace(/[$,%()]/g, "")) || 0;
+                        const nb = parseFloat(vb.replace(/[$,%()]/g, "")) || 0;
+                        return (na - nb) * m;
+                    }
+                    return va.localeCompare(vb) * m;
+                });
+                rows.forEach(r => tbody.appendChild(r));
+            });
+        });
+    });
+}
+
+window._portfolioData = DATA;
+renderDashboard(DATA);
+</script>
+</body>
+</html>
